@@ -6,16 +6,14 @@ import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-<<<<<<< HEAD
 from ..schemas import QueryRequest, QueryResponse, ErrorResponse
-=======
 from ..schemas import (
     QueryRequest,
     QueryResponse,
     SourceDocument,
     ErrorResponse
 )
->>>>>>> 99dffd9 (implementacao rastreamento e exibicao de fontes)
+
 from ..services import ITTGraph
 from ..dependencies import get_graph
 
@@ -50,7 +48,6 @@ async def query_response(
     graph: ITTGraph = Depends(get_graph),
 ) -> QueryResponse:
     try:
-<<<<<<< HEAD
         logger.info(f"Processing query from user: {query.user_id}")
 
         result = graph.invoke(query.message)
@@ -58,7 +55,7 @@ async def query_response(
         response = QueryResponse(
             response=result["response"],
             source_documents=result["source_documents"],
-=======
+        )
         logger.info(f"Processing query from user: {request.user_id}")
         
         result = graph.invoke(request.message)
@@ -70,7 +67,6 @@ async def query_response(
         response = QueryResponse(
             response=result["response"],
             source_documents=source_documents
->>>>>>> 99dffd9 (implementacao rastreamento e exibicao de fontes)
         )
 
         logger.info(f"Query processed successfully for user: {query.user_id}")
