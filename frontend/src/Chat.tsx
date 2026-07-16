@@ -14,9 +14,16 @@ interface ChatProps {
   onLogout: () => void;
 }
 
+interface SourceDocument {
+  source: string;
+  page: number | null;
+  snippet: string;
+}
+
 interface Mensagem {
   autor: "user" | "assistant";
   texto: string;
+  fontes?: SourceDocument[];
 }
 
 export default function Chat({ idToken, email, onLogout }: ChatProps) {
@@ -44,39 +51,39 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
     setMensagens((m) => [...m, loadingMsg]);
     setIsLoading(true);
 
-    const resposta = await consultarBackend(perguntaTexto);
+    const { texto, fontes } = await consultarBackend(perguntaTexto);
 
     setMensagens((m) =>
       m.map((msg) =>
-        msg === loadingMsg ? { autor: "assistant", texto: resposta } : msg
+        msg === loadingMsg
+          ? { autor: "assistant" as const, texto, fontes }
+          : msg
       )
     );
 
     setIsLoading(false);
   };
 
-  const consultarBackend = async (texto: string): Promise<string> => {
+  const consultarBackend = async (texto: string): Promise<{ texto: string; fontes: SourceDocument[] }> => {
     try {
       const res = await fetch(`${API_URL}/chat/query`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: texto,
-          user_id: email
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: texto, user_id: email }),
       });
 
       if (!res.ok) {
         const err = await res.json();
-        return `Erro do servidor: ${err.detail ?? "Desconhecido"}`;
+        return { texto: `Erro do servidor: ${err.detail ?? "Desconhecido"}`, fontes: [] };
       }
 
       const data = await res.json();
-      return data.response ?? "Erro ao gerar resposta.";
+      return {
+        texto: data.response ?? "Erro ao gerar resposta.",
+        fontes: data.source_documents ?? [],
+      };
     } catch (e) {
-      return "Erro de conexão com o servidor. " + e;
+      return { texto: "Erro de conexão com o servidor. " + e, fontes: [] };
     }
   };
 
@@ -155,9 +162,15 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
                   strong: ({ children }) => (
                     <strong style={{ color: "#fff" }}>{children}</strong>
                   ),
-                  em: ({ children }) => (
-                    <em style={{ opacity: 0.85 }}>{children}</em>
-                  ),
+                  em: ({ children }) => {
+                    const texto = typeof children === "string" ? children
+                      : Array.isArray(children) && typeof children[0] === "string" ? children[0]
+                      : "";
+                    if (texto.toLowerCase().startsWith("fonte:")) {
+                      return <em style={fonteAtribuicao}>{children}</em>;
+                    }
+                    return <em style={{ opacity: 0.85 }}>{children}</em>;
+                  },
                   ul: ({ children }) => (
                     <ul style={{ marginLeft: "20px", marginBottom: "8px" }}>{children}</ul>
                   ),
@@ -321,4 +334,14 @@ const sendBtn = {
   fontSize: "15px",
   fontWeight: 500,
   boxShadow: "0 0 10px rgba(59,130,246,0.5)",
+};
+
+const fonteAtribuicao = {
+  display: "block",
+  fontSize: "11px",
+  color: "#6b7280",
+  fontStyle: "italic" as const,
+  opacity: 1,
+  marginTop: "2px",
+  marginBottom: "4px",
 };

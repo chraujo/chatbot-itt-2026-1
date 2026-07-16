@@ -6,7 +6,16 @@ import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+<<<<<<< HEAD
 from ..schemas import QueryRequest, QueryResponse, ErrorResponse
+=======
+from ..schemas import (
+    QueryRequest,
+    QueryResponse,
+    SourceDocument,
+    ErrorResponse
+)
+>>>>>>> 99dffd9 (implementacao rastreamento e exibicao de fontes)
 from ..services import ITTGraph
 from ..dependencies import get_graph
 
@@ -15,7 +24,7 @@ logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(
-    prefix="/chat",
+    prefix="/chat", 
     tags=["chat"],
     responses={500: {"model": ErrorResponse, "description": "Internal server error"}}
 )
@@ -41,6 +50,7 @@ async def query_response(
     graph: ITTGraph = Depends(get_graph),
 ) -> QueryResponse:
     try:
+<<<<<<< HEAD
         logger.info(f"Processing query from user: {query.user_id}")
 
         result = graph.invoke(query.message)
@@ -48,6 +58,19 @@ async def query_response(
         response = QueryResponse(
             response=result["response"],
             source_documents=result["source_documents"],
+=======
+        logger.info(f"Processing query from user: {request.user_id}")
+        
+        result = graph.invoke(request.message)
+
+        source_documents = [
+            SourceDocument(**doc) for doc in result.get("source_documents", [])
+        ]
+
+        response = QueryResponse(
+            response=result["response"],
+            source_documents=source_documents
+>>>>>>> 99dffd9 (implementacao rastreamento e exibicao de fontes)
         )
 
         logger.info(f"Query processed successfully for user: {query.user_id}")

@@ -1,4 +1,5 @@
 from typing import TypedDict, Optional, List
+from pathlib import Path
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -40,10 +41,26 @@ class ITTGraph:
         llm_response = self.rag_chain.invoke({"input": question, "context": related_docs})
         text = (llm_response or "").strip()
 
-        if text.rstrip(".!?") == "Não sei":
+        if text.rstrip(".!?") == "Não sei": 
             return {"answer": "Não sei.", "citations": [], "rag_success": False}
 
-        citations = [{"content": doc.page_content} for doc in related_docs]
+        seen = set()
+        citations = []
+        for doc in related_docs:
+            raw_source = doc.metadata.get("source", "Desconhecido")
+            source_name = Path(raw_source).name
+            raw_page = doc.metadata.get("page")
+            page = (raw_page + 1) if isinstance(raw_page, int) else None
+            key = (source_name, page)
+            if key in seen:
+                continue
+            seen.add(key)
+            citations.append({
+                "source": source_name,
+                "page": page,
+                "snippet": doc.page_content[:300].strip(),
+            })
+
         return {"answer": text, "citations": citations, "rag_success": True}
 
     def _node_request_info(self, state: AgentState) -> AgentState:
@@ -81,5 +98,5 @@ class ITTGraph:
         result = self.graph.invoke({"question": question})
         return {
             "response": result.get("answer", ""),
-            "source_documents": [doc["content"] for doc in result.get("citations", [])]
+            "source_documents": result.get("citations", []),
         }

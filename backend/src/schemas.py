@@ -3,7 +3,7 @@ Pydantic schemas for request/response validation.
 """
 from pydantic import BaseModel, Field
 from typing import List, Optional
-
+ 
 
 class QueryRequest(BaseModel):
     """Request model for query endpoint."""
@@ -31,23 +31,30 @@ class QueryRequest(BaseModel):
 
 class SourceDocument(BaseModel):
     """Model for source document information."""
-    content: str = Field(..., description="Document content")
-    page: Optional[int] = Field(None, description="Page number if applicable")
+    source: str = Field(..., description="Source file name")
+    page: Optional[int] = Field(None, description="Page number (1-based)")
+    snippet: str = Field(..., description="Relevant part of the documen")
 
 
 class QueryResponse(BaseModel):
     """Response model for query endpoint."""
     response: str = Field(..., description="AI-generated response")
-    source_documents: List[str] = Field(
+    source_documents: List[SourceDocument] = Field(
         default_factory=list,
         description="List of source documents used"
     )
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "response": "Para solicitar um certificado...",
-                "source_documents": ["Documento 1 content...", "Documento 2 content..."]
+                "source_documents": [
+                    {
+                        "source": "estatuto_itt.pdf",
+                        "page": 4,
+                        "snippet": "Art. 5º - O Instituto Tadao Takahashi..."
+                    }
+                ]
             }
         }
 
