@@ -78,13 +78,10 @@ def get_triage_chain(settings: Settings):
 
     return TriageChain()
 
-<<<<<<< HEAD
-=======
 DOCUMENT_PROMPT = PromptTemplate(
     input_variables=["page_content", "source"],
     template="[Fonte: {source}]\n{page_content}"
 )
->>>>>>> 99dffd9 (implementacao rastreamento e exibicao de fontes)
 
 RAG_PROMPT_TEMPLATE = ChatPromptTemplate.from_messages([
     ("system",
@@ -127,9 +124,6 @@ def get_rag_chain(settings: Settings):
         max_retries=3,
         timeout=30,
     )
-<<<<<<< HEAD
-    return create_stuff_documents_chain(llm, RAG_PROMPT_TEMPLATE)
-=======
     return create_stuff_documents_chain(llm, RAG_PROMPT_TEMPLATE, document_prompt=DOCUMENT_PROMPT)
 
 
@@ -217,4 +211,3 @@ def get_rag_chain(settings: Settings):
 #         google_api_key=settings.GOOGLE_API_KEY
 #     )
 #     return create_stuff_documents_chain(llm, RAG_PROMPT_TEMPLATE)
->>>>>>> 99dffd9 (implementacao rastreamento e exibicao de fontes)
