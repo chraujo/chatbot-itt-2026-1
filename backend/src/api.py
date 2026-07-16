@@ -6,11 +6,16 @@ import uvicorn
 import asyncio
 from contextlib import asynccontextmanager
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
 from .routers import chat_router, admin_router
+from .routers.chat import limiter
 from .dependencies import get_settings
 from .services import VectorDB
 
-# --- NOVA LÓGICA DE INICIALIZAÇÃO ---
+
 async def startup_sync():
     """
     Função que roda em segundo plano quando o servidor liga.
@@ -19,12 +24,8 @@ async def startup_sync():
     print("Auto-Sync: Iniciando sincronização automática com Google Drive...")
     try:
         settings = get_settings()
-        # Verificação de segurança simples
         if settings.GOOGLE_DRIVE_FOLDER_ID and settings.GOOGLE_API_KEY:
-            # Instancia o VectorDB
             vector_db = VectorDB(settings)
-            
-            # Executa a recriação do índice (em uma thread separada para não travar o boot)
             await asyncio.to_thread(vector_db.refresh_knowledge_base)
             print("Auto-Sync: Memória recriada com sucesso! O Chat está pronto.")
         else:
@@ -32,19 +33,13 @@ async def startup_sync():
     except Exception as e:
         print(f"Auto-Sync Falhou: {str(e)}")
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- ANTES DO SERVIDOR INICIAR ---
-    # Dispara a sincronização em background (fire and forget)
-    # Isso garante que o servidor suba rápido, e a memória chega uns segundos depois.
     asyncio.create_task(startup_sync())
-    
     yield
-    
-    # --- QUANDO O SERVIDOR DESLIGA ---
     print("Servidor desligando...")
 
-# ------------------------------------
 
 settings = get_settings()
 
@@ -55,12 +50,16 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan  # <--- Conectamos a lógica aqui
+    lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, settings.FRONTEND_DEV_URL],  
+    allow_origins=[settings.FRONTEND_URL, settings.FRONTEND_DEV_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,6 +67,7 @@ app.add_middleware(
 
 app.include_router(chat_router)
 app.include_router(admin_router)
+
 
 @app.get("/", tags=["root"])
 async def root():
@@ -78,8 +78,9 @@ async def root():
         "message": "ITT Chatbot API",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
+
 
 if __name__ == "__main__":
     uvicorn.run(
@@ -87,5 +88,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        log_level="info"
+        log_level="info",
     )
