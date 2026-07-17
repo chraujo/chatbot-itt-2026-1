@@ -6,7 +6,6 @@ import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from ..schemas import QueryRequest, QueryResponse, ErrorResponse
 from ..schemas import (
     QueryRequest,
     QueryResponse,
