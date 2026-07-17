@@ -1,10 +1,12 @@
 import { useEffect } from "react";
+import { useTheme } from "./ThemeContext";
 
 interface LoginProps {
   onLogin: (token: string, email: string) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
+  const { darkMode } = useTheme();
   useEffect(() => {
     /* @ts-ignore */
     window.google?.accounts.id.initialize({
@@ -25,12 +27,17 @@ export default function Login({ onLogin }: LoginProps) {
   }, []);
 
   return (
-    <div style={page}>
-      <div style={card}>
-        <h1 style={title}>Acessar Assistente ITT</h1>
-        <p style={subtitle}>Faça login com sua conta Google institucional</p>
+    <div style={{...page, background: darkMode ? "linear-gradient(135deg, #0c0c0f 0%, #1a1626 100%)" : "linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)"}}>
+      <div style={{...card, background: darkMode ? "#1a1a1d" : "#ffffff", borderColor: darkMode ? "#dc2626" : "#dc2626"}}>
+        {/* LOGO ITT */}
+        <div style={logoContainer}>
+          <img src="/icon_itt.png" alt="ITT Logo" style={logo} />
+        </div>
 
-        <div style={googleBtnContainer}>
+        <h1 style={{...title, color: darkMode ? "#dc2626" : "#991b1b"}}>Acessar Assistente ITT</h1>
+        <p style={{...subtitle, color: darkMode ? "#cbd5e1" : "#4b5563"}}>Faça login utilizando sua conta Google</p>
+
+        <div style={{...googleBtnContainer, background: darkMode ? "rgba(220, 38, 38, 0.05)" : "rgba(220, 38, 38, 0.08)", borderColor: darkMode ? "rgba(220, 38, 38, 0.1)" : "rgba(220, 38, 38, 0.15)"}}>
           <div id="googleBtn" />
         </div>
 
@@ -38,9 +45,9 @@ export default function Login({ onLogin }: LoginProps) {
         {window.location.hostname === 'localhost' && (
           <button
             onClick={() => onLogin('dev-token', 'dev@itt.local')}
-            style={devButton}
+            style={{...devButton, background: darkMode ? "#4a5568" : "#cbd5e1", color: darkMode ? "#e5e7eb" : "#374151"}}
           >
-            🔧 Skip Login (Dev)
+            Skip Login (Dev)
           </button>
         )}
 
@@ -54,7 +61,7 @@ export default function Login({ onLogin }: LoginProps) {
 
 /* ---------------- ESTILOS DARK MODE ---------------- */
 const page = {
-  background: "#0c0c0f",
+  background: "linear-gradient(135deg, #0c0c0f 0%, #1a1626 100%)",
   height: "100vh",
   display: "flex",
   justifyContent: "center",
@@ -69,11 +76,23 @@ const card = {
   width: "100%",
   maxWidth: "420px",
   borderRadius: "14px",
-  border: "1px solid #2a2a2d",
-  boxShadow: "0 0 30px rgba(0,0,0,0.5)",
+  border: "1px solid #dc2626",
+  boxShadow: "0 0 40px rgba(220, 38, 38, 0.2)",
   display: "flex",
   flexDirection: "column" as const,
   gap: "20px",
+};
+
+const logoContainer = {
+  display: "flex",
+  justifyContent: "center",
+  marginBottom: "10px",
+};
+
+const logo = {
+  width: "60px",
+  height: "60px",
+  objectFit: "contain" as const,
 };
 
 const title = {
@@ -82,13 +101,20 @@ const title = {
   marginBottom: "8px",
   fontWeight: 600 as const,
   letterSpacing: "-0.5px",
+  textAlign: "center" as const,
+  background: "linear-gradient(135deg, #dc2626 0%, #ef4444 100%)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
 };
 
 const subtitle = {
-  opacity: 0.65,
+  opacity: 0.7,
   marginBottom: "8px",
   fontSize: "14px",
   lineHeight: "1.5",
+  textAlign: "center" as const,
+  color: "#cbd5e1",
 };
 
 const footer = {
@@ -103,6 +129,9 @@ const googleBtnContainer = {
   alignItems: "center",
   padding: "20px 0",
   minHeight: "60px",
+  background: "rgba(220, 38, 38, 0.05)",
+  borderRadius: "10px",
+  border: "1px solid rgba(220, 38, 38, 0.1)",
 };
 
 const devButton = {
