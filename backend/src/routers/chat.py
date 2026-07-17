@@ -52,14 +52,6 @@ async def query_response(
 
         result = graph.invoke(query.message)
 
-        response = QueryResponse(
-            response=result["response"],
-            source_documents=result["source_documents"],
-        )
-        logger.info(f"Processing query from user: {request.user_id}")
-        
-        result = graph.invoke(request.message)
-
         source_documents = [
             SourceDocument(**doc) for doc in result.get("source_documents", [])
         ]
