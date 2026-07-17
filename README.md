@@ -3,3 +3,5 @@ Fork do repositório https://github.com/programacao-dev/chatbot-itt-. Aqui, são
 Chris Araújo Felipe Souza - 250453
 
 Richard Matias de sousa - 243905
+
+Tallyta Duarte - 188305
