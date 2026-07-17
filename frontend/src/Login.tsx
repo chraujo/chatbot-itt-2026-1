@@ -30,7 +30,19 @@ export default function Login({ onLogin }: LoginProps) {
         <h1 style={title}>Acessar Assistente ITT</h1>
         <p style={subtitle}>Faça login com sua conta Google institucional</p>
 
-        <div id="googleBtn" />
+        <div style={googleBtnContainer}>
+          <div id="googleBtn" />
+        </div>
+
+        {/* Skip para desenvolvimento local */}
+        {window.location.hostname === 'localhost' && (
+          <button
+            onClick={() => onLogin('dev-token', 'dev@itt.local')}
+            style={devButton}
+          >
+            🔧 Skip Login (Dev)
+          </button>
+        )}
 
         <footer style={footer}>
           <small>Instituto Tadao Takahashi</small>
@@ -53,30 +65,56 @@ const page = {
 
 const card = {
   background: "#1a1a1d",
-  padding: "40px",
+  padding: "50px 40px",
   width: "100%",
   maxWidth: "420px",
   borderRadius: "14px",
   border: "1px solid #2a2a2d",
-  boxShadow: "0 0 20px rgba(0,0,0,0.4)",
+  boxShadow: "0 0 30px rgba(0,0,0,0.5)",
   display: "flex",
   flexDirection: "column" as const,
-  gap: "25px",
+  gap: "20px",
 };
 
 const title = {
-  fontSize: "26px",
+  fontSize: "28px",
   margin: 0,
-  fontWeight: "600",
+  marginBottom: "8px",
+  fontWeight: 600 as const,
+  letterSpacing: "-0.5px",
 };
 
 const subtitle = {
-  opacity: 0.7,
-  marginBottom: "10px",
+  opacity: 0.65,
+  marginBottom: "8px",
+  fontSize: "14px",
+  lineHeight: "1.5",
 };
 
 const footer = {
   marginTop: "20px",
   opacity: 0.4,
   textAlign: "center" as const,
+};
+
+const googleBtnContainer = {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: "20px 0",
+  minHeight: "60px",
+};
+
+const devButton = {
+  width: "100%",
+  padding: "10px",
+  marginTop: "10px",
+  background: "#4a5568",
+  color: "#e5e7eb",
+  border: "1px dashed #6b7280",
+  borderRadius: "8px",
+  fontSize: "13px",
+  cursor: "pointer",
+  transition: "all 0.2s",
+  fontWeight: 500 as const,
 };

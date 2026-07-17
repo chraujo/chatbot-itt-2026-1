@@ -149,38 +149,73 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
         </header>
 
         <div style={chatBox}>
+          {mensagens.length === 0 && (
+            <div style={welcomeMessage}>
+              <div style={welcomeIcon}>👋</div>
+              <h3 style={welcomeTitle}>Bem-vindo ao Assistente ITT</h3>
+              <p style={welcomeText}>
+                Faça perguntas sobre estatuto, processos, currículos, horários de funcionamento e muito mais.
+              </p>
+              <div style={exampleSection}>
+                <p style={exampleLabel}>Exemplos de perguntas:</p>
+                <ul style={exampleList}>
+                  <li style={exampleListItem}>"Qual é o horário de funcionamento do ITT?"</li>
+                  <li style={exampleListItem}>"Como funciona o processo de admissão?"</li>
+                  <li style={exampleListItem}>"Quais são os cursos disponíveis?"</li>
+                </ul>
+              </div>
+            </div>
+          )}
           {mensagens.map((m, i) => (
-            <div
-              key={i}
-              style={m.autor === "user" ? msgUser : msgAssistant}
-            >
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => (
-                    <p style={{ marginBottom: "8px", lineHeight: "1.6" }}>{children}</p>
-                  ),
-                  strong: ({ children }) => (
-                    <strong style={{ color: "#fff" }}>{children}</strong>
-                  ),
-                  em: ({ children }) => {
-                    const texto = typeof children === "string" ? children
-                      : Array.isArray(children) && typeof children[0] === "string" ? children[0]
-                      : "";
-                    if (texto.toLowerCase().startsWith("fonte:")) {
-                      return <em style={fonteAtribuicao}>{children}</em>;
-                    }
-                    return <em style={{ opacity: 0.85 }}>{children}</em>;
-                  },
-                  ul: ({ children }) => (
-                    <ul style={{ marginLeft: "20px", marginBottom: "8px" }}>{children}</ul>
-                  ),
-                  li: ({ children }) => (
-                    <li style={{ marginBottom: "4px" }}>{children}</li>
-                  )
-                }}
-              >
-                {m.texto}
-              </ReactMarkdown>
+            <div key={i} style={{ alignSelf: m.autor === "user" ? "flex-end" : "flex-start" }}>
+              <div style={m.autor === "user" ? msgUser : msgAssistant}>
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => (
+                      <p style={{ marginBottom: "8px", lineHeight: "1.6" }}>{children}</p>
+                    ),
+                    strong: ({ children }) => (
+                      <strong style={{ color: "#fff" }}>{children}</strong>
+                    ),
+                    em: ({ children }) => {
+                      const texto = typeof children === "string" ? children
+                        : Array.isArray(children) && typeof children[0] === "string" ? children[0]
+                        : "";
+                      if (texto.toLowerCase().startsWith("fonte:")) {
+                        return <em style={fonteAtribuicao}>{children}</em>;
+                      }
+                      return <em style={{ opacity: 0.85 }}>{children}</em>;
+                    },
+                    ul: ({ children }) => (
+                      <ul style={{ marginLeft: "20px", marginBottom: "8px" }}>{children}</ul>
+                    ),
+                    li: ({ children }) => (
+                      <li style={{ marginBottom: "4px" }}>{children}</li>
+                    )
+                  }}
+                >
+                  {m.texto}
+                </ReactMarkdown>
+              </div>
+
+              {m.autor === "assistant" && m.fontes && m.fontes.length > 0 && (
+                <div style={sourcesCard}>
+                  <div style={sourcesHeader}>
+                    📄 Fontes Utilizadas:
+                  </div>
+                  <div style={sourcesList}>
+                    {m.fontes.map((fonte, idx) => (
+                      <div key={idx} style={sourceItem}>
+                        <span style={sourceIcon}>•</span>
+                        <span style={sourceName}>
+                          {fonte.source}
+                          {fonte.page && <span style={sourcePage}> (página {fonte.page})</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -344,4 +379,107 @@ const fonteAtribuicao = {
   opacity: 1,
   marginTop: "2px",
   marginBottom: "4px",
+};
+
+const sourcesCard = {
+  background: "#2a2a2d",
+  border: "1px solid #3a3a3d",
+  borderRadius: "8px",
+  padding: "12px 14px",
+  marginTop: "8px",
+  maxWidth: "75%",
+  fontSize: "13px",
+};
+
+const sourcesHeader = {
+  color: "#cbd5e1",
+  fontWeight: 600 as const,
+  marginBottom: "8px",
+  fontSize: "12px",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.5px",
+};
+
+const sourcesList = {
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "5px",
+};
+
+const sourceItem = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  color: "#cbd5e1",
+};
+
+const sourceIcon = {
+  color: "#64748b",
+  fontSize: "14px",
+  minWidth: "10px",
+};
+
+const sourceName = {
+  fontSize: "13px",
+};
+
+const sourcePage = {
+  color: "#94a3b8",
+  fontSize: "12px",
+};
+
+const welcomeMessage = {
+  alignSelf: "center" as const,
+  textAlign: "center" as const,
+  padding: "40px 30px",
+  maxWidth: "500px",
+};
+
+const welcomeIcon = {
+  fontSize: "48px",
+  marginBottom: "16px",
+};
+
+const welcomeTitle = {
+  fontSize: "22px",
+  fontWeight: 600 as const,
+  marginBottom: "12px",
+  color: "#e5e7eb",
+};
+
+const welcomeText = {
+  fontSize: "14px",
+  color: "#cbd5e1",
+  marginBottom: "24px",
+  lineHeight: "1.6",
+};
+
+const exampleSection = {
+  background: "#2a2a2d",
+  borderRadius: "8px",
+  padding: "16px",
+  border: "1px solid #3a3a3d",
+};
+
+const exampleLabel = {
+  fontSize: "12px",
+  fontWeight: 600 as const,
+  color: "#94a3b8",
+  textTransform: "uppercase" as const,
+  marginBottom: "10px",
+};
+
+const exampleList = {
+  listStyle: "none",
+  padding: 0,
+  margin: 0,
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: "8px",
+};
+
+const exampleListItem = {
+  fontSize: "13px",
+  color: "#cbd5e1",
+  textAlign: "left" as const,
 };
