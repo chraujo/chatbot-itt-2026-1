@@ -2,12 +2,7 @@ import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { useTheme } from "./ThemeContext";
 
-// MUDANÇA IMPORTANTE:
-// Se estiver rodando localmente (backend na sua máquina), use localhost.
-// Se for subir para produção, você pode trocar aqui ou usar variável de ambiente.
-// Sugestão: Deixar localhost enquanto desenvolvemos.
-// const API_URL = "http://localhost:8000"; 
-const API_URL = "https://chatbot-itt-5lbt.onrender.com"; // URL antiga
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 interface ChatProps {
   idToken: string;
@@ -18,6 +13,7 @@ interface ChatProps {
 interface SourceDocument {
   source: string;
   page: number | null;
+  sheet?: string | null;
   snippet: string;
 }
 
@@ -29,7 +25,14 @@ interface Mensagem {
 }
 
 export default function Chat({ idToken, email, onLogout }: ChatProps) {
-  const [mensagens, setMensagens] = useState<Mensagem[]>([]);
+  const historyKey = `chat_history:${email}`;
+  const [mensagens, setMensagens] = useState<Mensagem[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(historyKey) || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [pergunta, setPergunta] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -39,22 +42,10 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // Carregar histórico do localStorage ao montar
-  useEffect(() => {
-    const saved = localStorage.getItem('chat_history');
-    if (saved) {
-      try {
-        setMensagens(JSON.parse(saved));
-      } catch (e) {
-        console.error('Erro ao carregar histórico:', e);
-      }
-    }
-  }, []);
-
   // Salvar histórico em localStorage sempre que mensagens mudam
   useEffect(() => {
-    localStorage.setItem('chat_history', JSON.stringify(mensagens));
-  }, [mensagens]);
+    localStorage.setItem(historyKey, JSON.stringify(mensagens));
+  }, [mensagens, historyKey]);
 
 
   const enviarPergunta = async () => {
@@ -80,7 +71,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
     setMensagens((m) =>
       m.map((msg) =>
         msg === loadingMsg
-          ? { autor: "assistant" as const, texto, fontes }
+          ? { ...msg, autor: "assistant" as const, texto, fontes }
           : msg
       )
     );
@@ -93,7 +84,14 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
       const res = await fetch(`${API_URL}/chat/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: texto, user_id: email }),
+        body: JSON.stringify({
+          message: texto,
+          user_id: email,
+          history: mensagens.slice(-12).map((message) => ({
+            role: message.autor,
+            content: message.texto.slice(0, 5000),
+          })),
+        }),
       });
 
       if (!res.ok) {
@@ -160,7 +158,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
                 opacity: isSyncing ? 0.7 : 1,
                 cursor: isSyncing ? 'wait' : 'pointer'
               }}
-              title="Atualizar base de conhecimento com arquivos do Google Drive"
+              title="Atualizar base de conhecimento com os documentos configurados"
             >
               {isSyncing ? 'Atualizando...' :
                syncStatus === 'success' ? 'Docs Atualizados!' :
@@ -235,6 +233,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
                         <span style={{...sourceName, color: darkMode ? '#cbd5e1' : '#4b5563'}}>
                           {fonte.source}
                           {fonte.page && <span style={sourcePage}> (página {fonte.page})</span>}
+                          {fonte.sheet && <span style={sourcePage}> (aba {fonte.sheet})</span>}
                         </span>
                       </div>
                     ))}

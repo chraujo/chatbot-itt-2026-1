@@ -24,12 +24,16 @@ async def startup_sync():
     print("Auto-Sync: Iniciando sincronização automática com Google Drive...")
     try:
         settings = get_settings()
-        if settings.GOOGLE_DRIVE_FOLDER_ID and settings.GOOGLE_API_KEY:
+        has_api_key = (
+            bool(settings.OPENWEBUI_API_KEY.get_secret_value())
+            if settings.LLM_PROVIDER == 'openwebui' else bool(settings.GOOGLE_API_KEY)
+        )
+        if settings.SYNC_ON_STARTUP and settings.GOOGLE_DRIVE_FOLDER_ID and has_api_key:
             vector_db = VectorDB(settings)
             await asyncio.to_thread(vector_db.refresh_knowledge_base)
             print("Auto-Sync: Memória recriada com sucesso! O Chat está pronto.")
         else:
-            print("Auto-Sync: Configurações do Drive incompletas. Pulando sincronização.")
+            print("Auto-Sync: Sincronizacao desativada ou configuracoes incompletas.")
     except Exception as e:
         print(f"Auto-Sync Falhou: {str(e)}")
 

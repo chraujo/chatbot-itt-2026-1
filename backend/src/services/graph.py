@@ -1,14 +1,15 @@
 from typing import TypedDict, Optional, List
 from pathlib import Path
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
-from .chains import get_triage_chain, get_rag_chain, TRIAGE_PROMPT
+from .chains import get_triage_chain, get_rag_chain
 from .vectorDB import VectorDB
 from ..config import Settings
 
 class AgentState(TypedDict, total=False):
     question: str
+    history: List[dict]
     triage: dict
     answer: Optional[str]
     citations: List[dict]
@@ -25,19 +26,23 @@ class ITTGraph:
     
     def _node_triage(self, state: AgentState) -> AgentState:
         question = state["question"]
-        triage_result = self.triage_chain.invoke([
-            SystemMessage(content=TRIAGE_PROMPT),
-            HumanMessage(content=question)
-        ])
+        messages = [
+            (HumanMessage if message['role'] == 'user' else AIMessage)(content=message['content'])
+            for message in state.get('history', [])
+        ]
+        triage_result = self.triage_chain.invoke(messages + [HumanMessage(content=question)])
         return {"triage": triage_result.dict()}
 
     def _node_auto_resolve(self, state: AgentState) -> AgentState:
-        question = state["question"]
-        related_docs = self.vector_db.query(question)
+        question = state['triage'].get('pergunta_contextualizada') or state['question']
+        search_query = state['triage'].get('consulta_busca')
+        related_docs = self.vector_db.query(search_query or question)
 
         if not related_docs:
             return {"answer": "Não sei.", "citations": [], "rag_success": False}
 
+        for doc in related_docs:
+            doc.metadata['source'] = Path(doc.metadata.get('source', 'Desconhecido')).name
         llm_response = self.rag_chain.invoke({"input": question, "context": related_docs})
         text = (llm_response or "").strip()
 
@@ -51,13 +56,15 @@ class ITTGraph:
             source_name = Path(raw_source).name
             raw_page = doc.metadata.get("page")
             page = (raw_page + 1) if isinstance(raw_page, int) else None
-            key = (source_name, page)
+            sheet = doc.metadata.get('sheet')
+            key = (source_name, page, sheet)
             if key in seen:
                 continue
             seen.add(key)
             citations.append({
                 "source": source_name,
                 "page": page,
+                "sheet": sheet,
                 "snippet": doc.page_content[:300].strip(),
             })
 
@@ -94,8 +101,8 @@ class ITTGraph:
 
         return workflow.compile()
     
-    def invoke(self, question: str) -> dict:
-        result = self.graph.invoke({"question": question})
+    def invoke(self, question: str, history: Optional[List[dict]] = None) -> dict:
+        result = self.graph.invoke({"question": question, "history": history or []})
         return {
             "response": result.get("answer", ""),
             "source_documents": result.get("citations", []),

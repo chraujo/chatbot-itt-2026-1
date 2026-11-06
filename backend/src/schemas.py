@@ -2,7 +2,12 @@
 Pydantic schemas for request/response validation.
 """
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Literal
+
+
+class ChatMessage(BaseModel):
+    role: Literal['user', 'assistant']
+    content: str = Field(..., min_length=1, max_length=5000)
  
 
 class QueryRequest(BaseModel):
@@ -19,6 +24,7 @@ class QueryRequest(BaseModel):
         description="Optional user identifier for tracking",
         example="user_123"
     )
+    history: List[ChatMessage] = Field(default_factory=list, max_length=12)
     
     class Config:
         json_schema_extra = {
@@ -33,6 +39,7 @@ class SourceDocument(BaseModel):
     """Model for source document information."""
     source: str = Field(..., description="Source file name")
     page: Optional[int] = Field(None, description="Page number (1-based)")
+    sheet: Optional[str] = Field(None, description="Worksheet name for Excel sources")
     snippet: str = Field(..., description="Relevant part of the documen")
 
 

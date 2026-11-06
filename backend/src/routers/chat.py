@@ -49,7 +49,7 @@ async def query_response(
     try:
         logger.info(f"Processing query from user: {query.user_id}")
 
-        result = graph.invoke(query.message)
+        result = graph.invoke(query.message, history=[message.model_dump() for message in query.history])
 
         source_documents = [
             SourceDocument(**doc) for doc in result.get("source_documents", [])
