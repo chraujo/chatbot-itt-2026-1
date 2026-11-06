@@ -1,7 +1,7 @@
 # Executar o chatbot com documentos do Google Drive
 
 Este guia usa a API da Unicamp para o modelo e os embeddings, com documentos
-da [pasta do projeto no Drive](https://drive.google.com/drive/folders/1LRHb0KlDshL94BoG3L0DzkM3mQJhA3J6).
+da pasta do projeto no Drive (peça o ID a quem administra o projeto).
 Execute os comandos a partir deste repositório, na branch `guilhermegodoi/test_api`.
 Não é necessário publicar a aplicação para testar localmente.
 
@@ -49,7 +49,7 @@ OPENWEBUI_BASE_URL=https://llm.ic.unicamp.br
 LLM_PROVIDER=openwebui
 LLM_MODEL=gemma3:12b
 OPENWEBUI_EMBEDDING_MODEL=nomic-embed-text:latest
-GOOGLE_DRIVE_FOLDER_ID=1LRHb0KlDshL94BoG3L0DzkM3mQJhA3J6
+GOOGLE_DRIVE_FOLDER_ID=id-da-pasta-do-projeto
 GOOGLE_CREDENTIALS_PATH=credentials/service_account.json
 FAISS_INDEX_PATH=faiss_index_openwebui
 RETRIEVAL_LANGUAGE=
@@ -124,7 +124,8 @@ O navegador envia as últimas 12 mensagens para resolver continuações como
 “qual a área de interesse dela?”. O histórico fica separado por usuário no navegador.
 As fontes de planilhas mostram o arquivo e a aba, sem inventar números de página.
 
-Para testar só a API, abra http://localhost:8000/docs e execute `POST /chat/query`
+Para testar só a API, abra http://localhost:8000/docs, clique em **Authorize**, use o token
+`dev-token` (com `AUTH_DEV_MODE=true`) e execute `POST /chat/query`
 com `{"message":"Qual é o assunto principal dos documentos?","user_id":"teste-local"}`.
 
 ## Diagnóstico e testes

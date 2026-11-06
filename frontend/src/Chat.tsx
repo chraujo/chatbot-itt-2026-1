@@ -24,6 +24,9 @@ interface Mensagem {
   timestamp: string;
 }
 
+const horaAtual = () =>
+  new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
 export default function Chat({ idToken, email, onLogout }: ChatProps) {
   const historyKey = `chat_history:${email}`;
   const [mensagens, setMensagens] = useState<Mensagem[]>(() => {
@@ -51,8 +54,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
   const enviarPergunta = async () => {
     if (!pergunta.trim() || isLoading) return;
 
-    const timestamp = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const msgUser: Mensagem = { autor: "user", texto: pergunta, timestamp };
+    const msgUser: Mensagem = { autor: "user", texto: pergunta, timestamp: horaAtual() };
     setMensagens((m) => [...m, msgUser]);
 
     const perguntaTexto = pergunta;
@@ -61,7 +63,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
     const loadingMsg: Mensagem = {
       autor: "assistant",
       texto: "Analisando a pergunta, aguarde um momento...",
-      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      timestamp: horaAtual()
     };
     setMensagens((m) => [...m, loadingMsg]);
     setIsLoading(true);
@@ -71,7 +73,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
     setMensagens((m) =>
       m.map((msg) =>
         msg === loadingMsg
-          ? { ...msg, autor: "assistant" as const, texto, fontes }
+          ? { ...msg, autor: "assistant" as const, texto, fontes, timestamp: horaAtual() }
           : msg
       )
     );
@@ -83,7 +85,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
     try {
       const res = await fetch(`${API_URL}/chat/query`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           message: texto,
           user_id: email,
@@ -93,6 +95,11 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
           })),
         }),
       });
+
+      if (res.status === 401) {
+        onLogout();
+        return { texto: "Sua sessão expirou. Entre novamente.", fontes: [] };
+      }
 
       if (!res.ok) {
         const err = await res.json();
@@ -118,8 +125,14 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
 
     try {
       const res = await fetch(`${API_URL}/admin/sync-knowledge`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` }
       });
+
+      if (res.status === 401) {
+        onLogout();
+        return;
+      }
 
       if (!res.ok) throw new Error('Falha na sincronização');
 

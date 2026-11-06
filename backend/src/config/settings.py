@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "https://chatbot-itt.vercel.app"
     
     GOOGLE_API_KEY: str = ""
+
+    GOOGLE_CLIENT_ID: str = "961077150905-dsdb9plq43u7akdb4c77g3ai3ch1budm.apps.googleusercontent.com"
+    AUTH_DEV_MODE: bool = False # Aceita o "dev-token" do botão "Skip Login (Dev)"; nunca em produção
     
     LLM_PROVIDER: Literal['openwebui', 'google'] = 'openwebui'
     OPENWEBUI_BASE_URL: str = 'https://llm.ic.unicamp.br'

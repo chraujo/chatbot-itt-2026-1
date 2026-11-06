@@ -55,11 +55,12 @@ RETRIEVAL_LANGUAGE=
 local_data_path="C:/caminho/para/documentos"
 FAISS_INDEX_PATH=faiss_index_openwebui
 GOOGLE_DRIVE_FOLDER_ID=
+AUTH_DEV_MODE=true
 ```
 
 `local_data_path` aceita uma pasta com PDFs/Excel `.xlsx` ou um único arquivo desses formatos.
-O `.env.example` inclui a pasta do Drive do projeto: deixe `GOOGLE_DRIVE_FOLDER_ID`
-vazio, como acima, para desativar a sincronização do Drive no modo local.
+Deixe `GOOGLE_DRIVE_FOLDER_ID` vazio, como acima, para desativar a sincronização
+do Drive no modo local.
 Use barras `/` nos caminhos Windows. A busca em pastas não é recursiva.
 Os PDFs precisam conter texto selecionável; este projeto não executa OCR.
 
@@ -103,11 +104,12 @@ Carregue somente índices FAISS locais e de confiança.
 .venv/Scripts/python.exe -m uvicorn src.api:app --host 127.0.0.1 --port 8000
 ```
 
-Abra http://localhost:8000/docs e use `POST /chat/query`, ou execute em outro terminal:
+As rotas exigem login. Com `AUTH_DEV_MODE=true`, use o token `dev-token`: abra
+http://localhost:8000/docs, clique em **Authorize** e use `POST /chat/query`, ou execute em outro terminal:
 
 ```powershell
 $body = @{ message = "Qual é o assunto principal do documento?"; user_id = "teste-local" } | ConvertTo-Json
-Invoke-RestMethod -Uri http://localhost:8000/chat/query -Method Post -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($body))
+Invoke-RestMethod -Uri http://localhost:8000/chat/query -Method Post -Headers @{ Authorization = "Bearer dev-token" } -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($body))
 ```
 
 O retorno contém `response` e `source_documents`, com arquivo, página e trecho
@@ -140,7 +142,7 @@ Reindexar é uma operação longa; use apenas quando os documentos mudarem.
 ## Testes e diagnóstico
 
 ```powershell
-.venv/Scripts/python.exe -m unittest discover -s tests -v
+uv run pytest -q
 ```
 
 Os testes automatizados simulam a API. O teste via `/chat/query` acima faz

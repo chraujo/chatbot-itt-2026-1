@@ -16,6 +16,16 @@ class AgentState(TypedDict, total=False):
     rag_success: bool
     final_action: str
 
+class Citation(TypedDict):
+    source: str
+    page: Optional[int]
+    sheet: Optional[str]
+    snippet: str
+
+class GraphResponse(TypedDict):
+    response: str
+    source_documents: List[Citation]
+
 class ITTGraph:
     def __init__(self, settings: Settings, vector_db: VectorDB):
         self.settings = settings
@@ -25,7 +35,7 @@ class ITTGraph:
         self.graph = self._build_graph()
     
     def _node_triage(self, state: AgentState) -> AgentState:
-        question = state["question"]
+        question = state.get("question", "")
         messages = [
             (HumanMessage if message['role'] == 'user' else AIMessage)(content=message['content'])
             for message in state.get('history', [])
@@ -34,8 +44,9 @@ class ITTGraph:
         return {"triage": triage_result.dict()}
 
     def _node_auto_resolve(self, state: AgentState) -> AgentState:
-        question = state['triage'].get('pergunta_contextualizada') or state['question']
-        search_query = state['triage'].get('consulta_busca')
+        triage = state.get("triage", {})
+        question = triage.get('pergunta_contextualizada') or state.get("question", "")
+        search_query = triage.get('consulta_busca')
         related_docs = self.vector_db.query(search_query or question)
 
         if not related_docs:
@@ -71,7 +82,7 @@ class ITTGraph:
         return {"answer": text, "citations": citations, "rag_success": True}
 
     def _node_request_info(self, state: AgentState) -> AgentState:
-        missing_fields = state["triage"].get("campos_faltantes", [])
+        missing_fields = state.get("triage", {}).get("campos_faltantes", [])
         details = ", ".join(missing_fields) if missing_fields else "mais detalhes sobre sua dúvida"
         return {
             "answer": f"Para te ajudar melhor, por favor, forneça {details}.",
@@ -80,7 +91,7 @@ class ITTGraph:
         }
 
     def _decide_after_triage(self, state: AgentState) -> str:
-        decision = state["triage"]["decisao"].lower()
+        decision = state.get("triage", {}).get("decisao", "").lower()
         if decision == "auto_resolver":
             return "auto_resolve"
         return "request_info"
@@ -101,7 +112,7 @@ class ITTGraph:
 
         return workflow.compile()
     
-    def invoke(self, question: str, history: Optional[List[dict]] = None) -> dict:
+    def invoke(self, question: str, history: Optional[List[dict]] = None) -> GraphResponse:
         result = self.graph.invoke({"question": question, "history": history or []})
         return {
             "response": result.get("answer", ""),
