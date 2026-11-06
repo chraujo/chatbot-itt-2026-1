@@ -86,6 +86,14 @@ async def root():
     }
 
 
+@app.get("/health", tags=["root"])
+async def health():
+    """
+    Liveness probe usado pelo healthcheck do Docker Compose.
+    """
+    return {"status": "ok"}
+
+
 if __name__ == "__main__":
     uvicorn.run(
         "api:app",

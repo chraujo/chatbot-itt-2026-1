@@ -128,6 +128,29 @@ Para testar só a API, abra http://localhost:8000/docs, clique em **Authorize**,
 `dev-token` (com `AUTH_DEV_MODE=true`) e execute `POST /chat/query`
 com `{"message":"Qual é o assunto principal dos documentos?","user_id":"teste-local"}`.
 
+## 6. Alternativa: rodar tudo com Docker
+
+Requisitos: Docker com Compose v2. As credenciais e o `backend/.test.env` ficam
+fora da imagem; o Compose os injeta/monta em tempo de execução.
+
+Na raiz do repositório:
+
+```bash
+cp -n backend/.env.example backend/.test.env   # se ainda não existir; preencha a chave
+docker compose build
+docker compose run --rm backend /app/.venv/bin/python -m src.index_documents --drive
+docker compose up -d
+```
+
+- Interface: http://localhost:5173 (o **Skip Login (Dev)** continua disponível).
+- API e Swagger: http://localhost:8000/docs.
+
+O índice FAISS fica no volume nomeado `faiss_index` e persiste entre reinícios.
+A indexação não roda no boot (`SYNC_ON_STARTUP=false`); repita o comando
+`docker compose run --rm backend ...` quando os documentos mudarem, ou use o
+botão **Atualizar Docs**. Para parar, use `docker compose down` (mantém o índice)
+ou `docker compose down -v` (apaga o índice).
+
 ## Diagnóstico e testes
 
 | Problema | Como resolver |
