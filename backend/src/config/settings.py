@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str = ""
 
     GOOGLE_CLIENT_ID: str = "961077150905-dsdb9plq43u7akdb4c77g3ai3ch1budm.apps.googleusercontent.com"
+    ALLOWED_EMAIL_DOMAIN: str = "institutotadao-itt.org.br" # Vazio aceita qualquer domínio
     AUTH_DEV_MODE: bool = False # Aceita o "dev-token" do botão "Skip Login (Dev)"; nunca em produção
     ADMIN_EMAILS: str = "" # E-mails que podem usar "Atualizar Docs", separados por vírgula
     

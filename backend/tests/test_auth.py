@@ -13,7 +13,7 @@ from src.routers.chat import limiter
 from src.services import IndexNotFoundError, VectorDB
 
 VALID_TOKEN = "token-valido"
-VALID_EMAIL = "pessoa@itt.org.br"
+VALID_EMAIL = "pessoa@institutotadao-itt.org.br"
 
 
 class StubITTGraph:
@@ -40,6 +40,10 @@ def google_unreachable(*_):
     raise TransportError()
 
 
+def signed_in_as(email: str):
+    return lambda *_: {"email": email, "email_verified": True}
+
+
 def issued_10s_in_the_future(token, request, audience, clock_skew_in_seconds):
     if clock_skew_in_seconds < 10:
         raise ValueError("Token used too early")
@@ -56,10 +60,12 @@ def reset_app():
 
 @pytest.fixture
 def make_client(monkeypatch):
-    def make(dev_mode=False, verify=fake_verify, admin_emails=""):
+    def make(dev_mode=False, verify=fake_verify, admin_emails="", 
+             allowed_domain="institutotadao-itt.org.br"):
         monkeypatch.setattr(dependencies.id_token, "verify_oauth2_token", verify)
         app.dependency_overrides[get_settings] = lambda: Settings(
-            GOOGLE_API_KEY="falsa", AUTH_DEV_MODE=dev_mode, ADMIN_EMAILS=admin_emails
+            GOOGLE_API_KEY="falsa", AUTH_DEV_MODE=dev_mode, ADMIN_EMAILS=admin_emails,
+            ALLOWED_EMAIL_DOMAIN=allowed_domain,
         )
         app.dependency_overrides[get_graph] = StubITTGraph
         app.dependency_overrides[get_vector_db] = StubVectorDB
@@ -110,6 +116,22 @@ def test_chat_with_valid_token_returns_answer(client):
 
 def test_unverified_email_returns_401(make_client):
     assert ask(make_client(verify=unverified_email), VALID_TOKEN).status_code == 401
+
+
+def test_account_outside_the_domain_returns_403(make_client):
+    for email in ("pessoa@gmail.com", "pessoa@outro.institutotadao-itt.org.br",
+                  "pessoa@institutotadao-itt.org.br.exemplo.com"):
+        assert ask(make_client(verify=signed_in_as(email)), VALID_TOKEN).status_code == 403, email
+
+
+def test_domain_check_ignores_case(make_client):
+    client = make_client(verify=signed_in_as("Pessoa@InstitutoTadao-ITT.org.br"))
+    assert ask(client, VALID_TOKEN).status_code == 200
+
+
+def test_empty_domain_accepts_any_account(make_client):
+    client = make_client(verify=signed_in_as("pessoa@gmail.com"), allowed_domain="")
+    assert ask(client, VALID_TOKEN).status_code == 200
 
 
 def test_small_clock_difference_is_tolerated(make_client):

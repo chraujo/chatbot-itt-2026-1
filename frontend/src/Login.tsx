@@ -12,7 +12,8 @@ export default function Login({ onLogin }: LoginProps) {
     const renderGoogleButton = () => {
       /* @ts-ignore */
       window.google.accounts.id.initialize({
-        client_id: "961077150905-dsdb9plq43u7akdb4c77g3ai3ch1budm.apps.googleusercontent.com",
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+          "961077150905-dsdb9plq43u7akdb4c77g3ai3ch1budm.apps.googleusercontent.com",
         callback: (response: any) => {
           const cred = response.credential;
           const payload = JSON.parse(atob(cred.split(".")[1]));

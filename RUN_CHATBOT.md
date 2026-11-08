@@ -134,9 +134,15 @@ O navegador envia as últimas 12 mensagens para resolver continuações como
 “qual a área de interesse dela?”. O histórico fica separado por usuário no navegador.
 As fontes de planilhas mostram o arquivo e a aba, sem inventar números de página.
 
-Para testar só a API, abra http://localhost:8000/docs, clique em **Authorize**, use o token
-`dev-token` (com `AUTH_DEV_MODE=true`) e execute `POST /chat/query`
-com `{"message":"Qual é o assunto principal dos documentos?"}`.
+Para testar só a API, com `AUTH_DEV_MODE=true`:
+
+1. Abra http://localhost:8000/docs.
+2. Clique em **Authorize**, digite apenas `dev-token` e confirme.
+3. Em `POST /chat/query`, clique em **Try it out** e depois em **Execute**.
+
+Com login real, só entram contas do domínio em `ALLOWED_EMAIL_DOMAIN` (padrão:
+`institutotadao-itt.org.br`); as demais recebem 403. Para trocar o Client ID do Google,
+defina o mesmo valor em `GOOGLE_CLIENT_ID` (backend) e `VITE_GOOGLE_CLIENT_ID` (frontend).
 
 ## 6. Alternativa: rodar tudo com Docker
 
