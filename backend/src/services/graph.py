@@ -88,7 +88,8 @@ class ITTGraph:
                 "source": source_name,
                 "page": page,
                 "sheet": sheet,
-                "snippet": doc.page_content[:300].strip(),
+                # Sem o cabeçalho "Arquivo:/Aba:" que a indexação põe em cada trecho para o modelo.
+                "snippet": re.sub(r'\A(?:(?:Arquivo|Aba): .*\n)+', '', doc.page_content)[:300].strip(),
             })
 
         if triage.get("pede_fonte") or triage.get("decisao") == "FONTE_ANTERIOR":

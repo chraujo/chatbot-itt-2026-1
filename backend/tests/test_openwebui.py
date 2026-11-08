@@ -111,13 +111,13 @@ class OpenWebUITest(unittest.TestCase):
         ]
         database = Mock()
         database.query.return_value = [Document(
-            page_content='Arquivo: Manual 2022-08-20--1Ab_c-D.pdf\nAbre as nove.',
+            page_content='Arquivo: Manual 2022-08-20--1Ab_c-D.pdf\nAba: Horários\nAbre as nove.',
             metadata={'source': '/tmp/Manual 2022-08-20--1Ab_c-D.pdf'},
         )]
         result = ITTGraph(self.settings, database).invoke('Que horas abre?')
         self.assertNotIn('1Ab_c-D', post.call_args.kwargs['json']['messages'][-1]['content'])
         self.assertEqual(result['source_documents'][0]['source'], 'Manual 2022-08-20.pdf')
-        self.assertNotIn('1Ab_c-D', result['source_documents'][0]['snippet'])
+        self.assertEqual(result['source_documents'][0]['snippet'], 'Abre as nove.')
 
     def source_graph(self):
         database = Mock()

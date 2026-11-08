@@ -118,6 +118,14 @@ def test_unverified_email_returns_401(make_client):
     assert ask(make_client(verify=unverified_email), VALID_TOKEN).status_code == 401
 
 
+def test_rate_limit_returns_429_with_detail_in_portuguese(client):
+    limiter.enabled = True
+    limiter.reset()
+    responses = [ask(client, VALID_TOKEN) for _ in range(6)]
+    assert [r.status_code for r in responses] == [200] * 5 + [429]
+    assert "Aguarde um minuto" in responses[-1].json()["detail"]
+
+
 def test_account_outside_the_domain_returns_403(make_client):
     for email in ("pessoa@gmail.com", "pessoa@outro.institutotadao-itt.org.br",
                   "pessoa@institutotadao-itt.org.br.exemplo.com"):

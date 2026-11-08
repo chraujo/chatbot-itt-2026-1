@@ -1,12 +1,9 @@
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-import uvicorn
 import asyncio
 from contextlib import asynccontextmanager
 
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
@@ -58,8 +55,17 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+
+# Substitui o handler do slowapi, que responde em inglês no campo "error":
+# o frontend mostra o campo "detail", como nos demais erros da API.
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded(*_: object) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Muitas perguntas em pouco tempo. Aguarde um minuto e tente de novo."},
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -92,13 +98,3 @@ async def health():
     Liveness probe usado pelo healthcheck do Docker Compose.
     """
     return {"status": "ok"}
-
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "api:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info",
-    )
