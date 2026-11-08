@@ -46,7 +46,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
 
   // Estado para o botão de sincronização
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error' | 'forbidden'>('idle');
 
   useEffect(() => {
     sessionStorage.setItem(historyKey, JSON.stringify(mensagens));
@@ -141,6 +141,12 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
         return;
       }
 
+      if (res.status === 403) {
+        setSyncStatus('forbidden');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+        return;
+      }
+
       if (!res.ok) throw new Error('Falha na sincronização');
 
       setSyncStatus('success');
@@ -173,7 +179,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
               onClick={sincronizarConhecimento}
               style={{
                 ...syncBtn,
-                background: syncStatus === 'error' ? '#ef4444' :
+                background: syncStatus === 'error' || syncStatus === 'forbidden' ? '#ef4444' :
                            syncStatus === 'success' ? '#22c55e' : '#dc2626',
                 opacity: isSyncing ? 0.7 : 1,
                 cursor: isSyncing ? 'wait' : 'pointer'
@@ -183,6 +189,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
               {isSyncing ? 'Atualizando...' :
                syncStatus === 'success' ? 'Docs Atualizados!' :
                syncStatus === 'error' ? 'Erro' :
+               syncStatus === 'forbidden' ? 'Sem permissão' :
                'Atualizar Docs'}
             </button>
 

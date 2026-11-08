@@ -13,6 +13,7 @@ from src.routers.chat import limiter
 from src.services import IndexNotFoundError, VectorDB
 
 VALID_TOKEN = "token-valido"
+VALID_EMAIL = "pessoa@itt.org.br"
 
 
 class StubITTGraph:
@@ -27,7 +28,7 @@ class StubVectorDB:
 
 def fake_verify(token, request, audience, clock_skew_in_seconds):
     if token == VALID_TOKEN and audience == Settings().GOOGLE_CLIENT_ID:
-        return {"email": "pessoa@itt.org.br", "email_verified": True}
+        return {"email": VALID_EMAIL, "email_verified": True}
     raise ValueError("token inválido")
 
 
@@ -42,7 +43,7 @@ def google_unreachable(*_):
 def issued_10s_in_the_future(token, request, audience, clock_skew_in_seconds):
     if clock_skew_in_seconds < 10:
         raise ValueError("Token used too early")
-    return {"email": "pessoa@itt.org.br", "email_verified": True}
+    return {"email": VALID_EMAIL, "email_verified": True}
 
 
 @pytest.fixture(autouse=True)
@@ -55,9 +56,11 @@ def reset_app():
 
 @pytest.fixture
 def make_client(monkeypatch):
-    def make(dev_mode=False, verify=fake_verify):
+    def make(dev_mode=False, verify=fake_verify, admin_emails=""):
         monkeypatch.setattr(dependencies.id_token, "verify_oauth2_token", verify)
-        app.dependency_overrides[get_settings] = lambda: Settings(GOOGLE_API_KEY="falsa", AUTH_DEV_MODE=dev_mode)
+        app.dependency_overrides[get_settings] = lambda: Settings(
+            GOOGLE_API_KEY="falsa", AUTH_DEV_MODE=dev_mode, ADMIN_EMAILS=admin_emails
+        )
         app.dependency_overrides[get_graph] = StubITTGraph
         app.dependency_overrides[get_vector_db] = StubVectorDB
         return TestClient(app)
@@ -137,12 +140,30 @@ def test_admin_without_token_returns_401(client):
     assert sync(client).status_code == 401
 
 
-def test_admin_with_valid_token_syncs(client):
+def test_admin_outside_the_list_returns_403(make_client):
+    assert sync(make_client(), VALID_TOKEN).status_code == 403
+    assert sync(make_client(admin_emails="outra@itt.org.br"), VALID_TOKEN).status_code == 403
+
+
+def test_admin_in_the_list_syncs(make_client):
+    client = make_client(admin_emails=f"outra@itt.org.br, {VALID_EMAIL.upper()}")
     assert sync(client, VALID_TOKEN).status_code == 200
 
 
-def graph_raising(error):
-    return lambda: Mock(**{"invoke.side_effect": error})
+def test_admin_sync_failure_returns_500_without_internal_details(make_client):
+    client = make_client(admin_emails=VALID_EMAIL)
+    vector_db = Mock()
+    vector_db.refresh_knowledge_base.side_effect = RuntimeError("/app/segredo")
+    app.dependency_overrides[get_vector_db] = lambda: vector_db
+    response = sync(client, VALID_TOKEN)
+    assert response.status_code == 500
+    assert "/app/segredo" not in response.text
+
+
+def graph_raising(error: Exception):
+    graph = Mock()
+    graph.invoke.side_effect = error
+    return lambda: graph
 
 
 def test_missing_index_returns_503_without_internal_path(client):
