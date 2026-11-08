@@ -22,7 +22,8 @@ services:
       - faiss_index:/app/faiss_index_openwebui
       - ./backend/credentials:/app/credentials:ro
     ports:
-      - "8000:8000"
+      # Só nesta maquina: com AUTH_DEV_MODE=true, a API aceita o dev-token.
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test:
         - CMD
@@ -41,7 +42,7 @@ services:
         VITE_API_URL: http://localhost:8000
     ports:
       # 5173 no host: e a origem liberada pelo CORS do backend.
-      - "5173:80"
+      - "127.0.0.1:5173:80"
     depends_on:
       backend:
         condition: service_healthy

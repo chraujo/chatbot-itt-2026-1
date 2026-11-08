@@ -1,50 +1,83 @@
+from langchain.embeddings import CacheBackedEmbeddings
+from langchain.storage import LocalFileStore
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pathlib import Path
-import os
 from tempfile import TemporaryDirectory
 from openpyxl import load_workbook
 from langchain_core.documents import Document
 import re
-import unicodedata
 
 from ..config import Settings
-from .google_drive import DriveService 
+from .google_drive import DriveService
 from .openwebui import OpenWebUIEmbeddings
+from .spreadsheets import normalize, sheet_lines
 
 
-class VectorDB: 
-    def __init__(self, settings: Settings): 
+class IndexNotFoundError(ValueError):
+    pass
+
+
+class AmbiguousPersonError(ValueError):
+    def __init__(self, names: list[str]):
+        super().__init__(f'Mais de uma pessoa corresponde a pergunta: {len(names)}')
+        self.names = names
+
+
+class VectorDB:
+    def __init__(self, settings: Settings):
         self.settings = settings
         self.embedder = OpenWebUIEmbeddings(settings) if settings.LLM_PROVIDER == 'openwebui' else GoogleGenerativeAIEmbeddings(
             model="models/gemini-embedding-001",
             google_api_key=settings.GOOGLE_API_KEY
         )
 
-    def query(self, message : str):
-
-        if not os.path.exists(self.settings.FAISS_INDEX_PATH):
-            raise ValueError("O índice FAISS não foi encontrado. Certifique-se de que o índice foi criado e salvo corretamente.")
+    def query(self, message : str) -> list[Document]:
+        # A pasta pode existir vazia: no Docker, o volume do índice começa assim.
+        if not (Path(self.settings.FAISS_INDEX_PATH) / 'index.faiss').exists():
+            raise IndexNotFoundError("O índice FAISS não foi encontrado. " \
+            "Certifique-se de que o índice foi criado e salvo corretamente.")
         
         vectorstore = FAISS.load_local(self.settings.FAISS_INDEX_PATH, self.embedder, allow_dangerous_deserialization=True)
 
         # Fichas de alunos usam formularios parecidos: um nome de arquivo explicito
         # deve restringir a busca antes de comparar os trechos por similaridade.
-        def normalize(text):
-            text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode().lower()
-            return ' '.join(re.findall(r'[a-z0-9]+', text))
-
         query = f' {normalize(message)} '
         matches = {}
+        people = {}
+        people_sources = {}
         # ponytail: varredura linear de titulos; criar catalogo se o indice crescer.
         for doc_id in vectorstore.index_to_docstore_id.values():
             doc = vectorstore.docstore.search(doc_id)
+            # A busca devolve um texto de erro se o ID não existir (índice inconsistente).
+            if not isinstance(doc, Document):
+                continue
             source = doc.metadata.get('source', '')
-            title = normalize(Path(source).stem.split('--')[0])
+            name = Path(source).stem.split('--')[0]
+            title = normalize(name)
             if len(title) >= 5 and f' {title} ' in query:
                 matches[source] = len(title)
+            # Planilhas individuais têm o nome da pessoa: conta quantas palavras iniciais
+            # do nome aparecem na pergunta ("Pedro" = 1, "Pedro Henrique" = 2).
+            words = title.split()
+            if source.lower().endswith('.xlsx') and words and len(words[0]) >= 3 and words[0].isalpha():
+                matched = 0
+                while matched < len(words) and f' {" ".join(words[:matched + 1])} ' in query:
+                    matched += 1
+                if matched:
+                    people[name] = max(matched, people.get(name, 0))
+                    people_sources.setdefault(name, set()).add(source)
+
+        if not matches and people:
+            best = max(people.values())
+            candidates = sorted(name for name, matched in people.items() if matched == best)
+            if len(candidates) > 1:
+                raise AmbiguousPersonError(candidates)
+            if best >= 2:
+                matches = {source: best for source in people_sources[candidates[0]]}
+
         if matches:
             longest = max(matches.values())
             sources = {source for source, length in matches.items() if length == longest}
@@ -61,10 +94,10 @@ class VectorDB:
         
     def create_faiss_index(self, parent_folder : str):
 
-        if not os.path.exists(parent_folder):
-            raise ValueError(f"O diretório {parent_folder} não existe. Verifique o caminho e tente novamente.")
-        
         folder_path = Path(parent_folder)
+        if not folder_path.exists():
+            raise ValueError(f"O diretório {parent_folder} não existe. Verifique o caminho e tente novamente.")
+
 
         docs = []
         files = [folder_path] if folder_path.is_file() else folder_path.iterdir()
@@ -76,12 +109,7 @@ class VectorDB:
                     workbook = load_workbook(file_path, read_only=True, data_only=True)
                     try:
                         for sheet in workbook:
-                            rows = []
-                            for row in sheet.iter_rows():
-                                cells = [f'{cell.coordinate}: {cell.value}' for cell in row
-                                         if cell.value is not None and str(cell.value).strip()]
-                                if cells:
-                                    rows.append(' | '.join(cells))
+                            rows = sheet_lines(sheet, file_path.stem.split('--')[0])
                             if rows:
                                 docs.append(Document(page_content='\n'.join(rows), metadata={
                                     'source': str(file_path), 'sheet': sheet.title,
@@ -97,7 +125,7 @@ class VectorDB:
                 raise ValueError(f'Erro ao carregar {file_path.name}. O indice nao foi alterado.') from e
 
         print(f"Total de documentos carregados: {len(docs)}")
-        
+
         if not docs:
             raise ValueError('Nenhum documento com texto foi encontrado. O indice nao foi alterado.')
         
@@ -117,9 +145,26 @@ class VectorDB:
         if not split_docs:
             raise ValueError('Nenhum documento com texto foi encontrado. O indice nao foi alterado.')
 
-        vectorstore = FAISS.from_documents(split_docs, self.embedder)
+        cached_embedder = self._cached_embedder()
+        texts = [doc.page_content for doc in split_docs]
+        for start in range(0, len(texts), 32):
+            cached_embedder.embed_documents(texts[start:start + 32])
+            print(f'Embeddings: {min(start + 32, len(texts))} de {len(texts)} trechos', flush=True)
+
+        vectorstore = FAISS.from_documents(split_docs, cached_embedder)
 
         vectorstore.save_local(self.settings.FAISS_INDEX_PATH)
+
+    def _cached_embedder(self):
+        # Dentro da pasta do índice para usar o mesmo volume no Docker. Cada modelo
+        # tem seu namespace, e a chave do LocalFileStore não aceita caracteres como ':'.
+        if self.settings.LLM_PROVIDER == 'openwebui':
+            model = self.settings.OPENWEBUI_EMBEDDING_MODEL
+        else:
+            model = 'gemini-embedding-001'
+        namespace = re.sub(r'[^a-zA-Z0-9_.-]', '_', model) + '-'
+        store = LocalFileStore(Path(self.settings.FAISS_INDEX_PATH) / 'embeddings_cache')
+        return CacheBackedEmbeddings.from_bytes_store(self.embedder, store, namespace=namespace)
 
 
     def refresh_knowledge_base(self):

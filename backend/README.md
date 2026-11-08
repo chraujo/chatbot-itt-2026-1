@@ -108,7 +108,7 @@ As rotas exigem login. Com `AUTH_DEV_MODE=true`, use o token `dev-token`: abra
 http://localhost:8000/docs, clique em **Authorize** e use `POST /chat/query`, ou execute em outro terminal:
 
 ```powershell
-$body = @{ message = "Qual é o assunto principal do documento?"; user_id = "teste-local" } | ConvertTo-Json
+$body = @{ message = "Qual é o assunto principal do documento?" } | ConvertTo-Json
 Invoke-RestMethod -Uri http://localhost:8000/chat/query -Method Post -Headers @{ Authorization = "Bearer dev-token" } -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($body))
 ```
 

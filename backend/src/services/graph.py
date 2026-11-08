@@ -1,10 +1,11 @@
 from typing import TypedDict, Optional, List
 from pathlib import Path
+import re
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import AIMessage, HumanMessage
 
 from .chains import get_triage_chain, get_rag_chain
-from .vectorDB import VectorDB
+from .vectorDB import VectorDB, AmbiguousPersonError
 from ..config import Settings
 
 class AgentState(TypedDict, total=False):
@@ -47,18 +48,29 @@ class ITTGraph:
         triage = state.get("triage", {})
         question = triage.get('pergunta_contextualizada') or state.get("question", "")
         search_query = triage.get('consulta_busca')
-        related_docs = self.vector_db.query(search_query or question)
+        try:
+            related_docs = self.vector_db.query(search_query or question)
+        except AmbiguousPersonError as error:
+            names = "\n".join(f"- {name}" for name in error.names)
+            return {
+                "answer": f"Encontrei mais de uma pessoa com esse nome:\n\n{names}\n\nSobre qual delas você quer saber?",
+                "citations": [],
+                "rag_success": False,
+            }
 
-        if not related_docs:
-            return {"answer": "Não sei.", "citations": [], "rag_success": False}
+        text = ""
+        if related_docs:
+            for doc in related_docs:
+                file_name = Path(doc.metadata.get('source', 'Desconhecido')).name
+                # Arquivos do Drive são salvos como "nome--id.ext". O ID não interessa a quem lê.
+                display_name = re.sub(r'--[\w-]+(?=\.\w+$)', '', file_name)
+                doc.page_content = doc.page_content.replace(file_name, display_name)
+                doc.metadata['source'] = display_name
+            text = (self.rag_chain.invoke({"input": question, "context": related_docs}) or "").strip()
 
-        for doc in related_docs:
-            doc.metadata['source'] = Path(doc.metadata.get('source', 'Desconhecido')).name
-        llm_response = self.rag_chain.invoke({"input": question, "context": related_docs})
-        text = (llm_response or "").strip()
-
-        if text.rstrip(".!?") == "Não sei": 
-            return {"answer": "Não sei.", "citations": [], "rag_success": False}
+        if not text or re.search(r'n[aã]o_encontrado', text, re.IGNORECASE):
+            return {"answer": "Não encontrei essa informação nos documentos.", "citations": [], 
+                    "rag_success": False}
 
         seen = set()
         citations = []
@@ -79,7 +91,18 @@ class ITTGraph:
                 "snippet": doc.page_content[:300].strip(),
             })
 
+        if triage.get("pede_fonte") or triage.get("decisao") == "FONTE_ANTERIOR":
+            names = dict.fromkeys(citation["source"] for citation in citations)
+            text += f"\n\nFonte: {', '.join(names)}"
+
         return {"answer": text, "citations": citations, "rag_success": True}
+
+    def _node_previous_sources(self, state: AgentState) -> AgentState:
+        answers = [message for message in state.get("history", []) if message["role"] == "assistant"]
+        sources = answers[-1].get("sources")
+        if not sources:
+            return {"answer": "A resposta anterior não usou documentos.", "citations": []}
+        return {"answer": f"Fonte: {', '.join(sources)}", "citations": []}
 
     def _node_request_info(self, state: AgentState) -> AgentState:
         missing_fields = state.get("triage", {}).get("campos_faltantes", [])
@@ -92,7 +115,10 @@ class ITTGraph:
 
     def _decide_after_triage(self, state: AgentState) -> str:
         decision = state.get("triage", {}).get("decisao", "").lower()
-        if decision == "auto_resolver":
+        has_previous_answer = any(message["role"] == "assistant" for message in state.get("history", []))
+        if decision == "fonte_anterior" and has_previous_answer:
+            return "previous_sources"
+        if decision in ("auto_resolver", "fonte_anterior"):
             return "auto_resolve"
         return "request_info"
 
@@ -101,14 +127,17 @@ class ITTGraph:
         workflow.add_node("triage_node", self._node_triage)
         workflow.add_node("auto_resolve", self._node_auto_resolve)
         workflow.add_node("request_info", self._node_request_info)
+        workflow.add_node("previous_sources", self._node_previous_sources)
 
         workflow.add_edge(START, "triage_node")
         workflow.add_conditional_edges("triage_node", self._decide_after_triage, {
             "auto_resolve": "auto_resolve",
-            "request_info": "request_info"
+            "request_info": "request_info",
+            "previous_sources": "previous_sources"
         })
         workflow.add_edge("auto_resolve", END)
         workflow.add_edge("request_info", END)
+        workflow.add_edge("previous_sources", END)
 
         return workflow.compile()
     

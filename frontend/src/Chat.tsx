@@ -29,9 +29,12 @@ const horaAtual = () =>
 
 export default function Chat({ idToken, email, onLogout }: ChatProps) {
   const historyKey = `chat_history:${email}`;
+  // O histórico vale só enquanto a aba está aberta: as respostas podem ter dados de alunos
+  // e não devem ficar no computador. Remove também o histórico salvo pelas versões antigas.
   const [mensagens, setMensagens] = useState<Mensagem[]>(() => {
+    localStorage.removeItem(historyKey);
     try {
-      return JSON.parse(localStorage.getItem(historyKey) || '[]');
+      return JSON.parse(sessionStorage.getItem(historyKey) || '[]');
     } catch {
       return [];
     }
@@ -45,10 +48,14 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  // Salvar histórico em localStorage sempre que mensagens mudam
   useEffect(() => {
-    localStorage.setItem(historyKey, JSON.stringify(mensagens));
+    sessionStorage.setItem(historyKey, JSON.stringify(mensagens));
   }, [mensagens, historyKey]);
+
+  const sair = () => {
+    sessionStorage.removeItem(historyKey);
+    onLogout();
+  };
 
 
   const enviarPergunta = async () => {
@@ -88,10 +95,10 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({
           message: texto,
-          user_id: email,
           history: mensagens.slice(-12).map((message) => ({
             role: message.autor,
             content: message.texto.slice(0, 5000),
+            sources: Array.from(new Set((message.fontes ?? []).map((fonte) => fonte.source))),
           })),
         }),
       });
@@ -179,7 +186,19 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
                'Atualizar Docs'}
             </button>
 
-            <button onClick={onLogout} style={{...logoutBtn, background: darkMode ? '#2b2b2e' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#1a1a1d'}}>Sair</button>
+            <button
+              onClick={() => setMensagens([])}
+              disabled={isLoading}
+              style={{...logoutBtn, background: darkMode ? '#2b2b2e' : '#e5e7eb', 
+                color: darkMode ? '#e5e7eb' : '#1a1a1d', opacity: isLoading ? 0.5 : 1}}
+              title="Apagar esta conversa e começar outra"
+            >
+              Nova conversa
+            </button>
+
+            <button onClick={sair} style={{...logoutBtn, 
+              background: darkMode ? '#2b2b2e' : '#e5e7eb', 
+              color: darkMode ? '#e5e7eb' : '#1a1a1d'}}>Sair</button>
           </div>
         </header>
 
@@ -235,10 +254,11 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
               <span style={{fontSize: '11px', color: darkMode ? '#64748b' : '#9ca3af', marginTop: '4px', marginRight: m.autor === "user" ? '0px' : 'auto', marginLeft: m.autor === "user" ? 'auto' : '0px'}}>{m.timestamp}</span>
 
               {m.autor === "assistant" && m.fontes && m.fontes.length > 0 && (
-                <div style={{...sourcesCard, background: darkMode ? '#2a2a2d' : '#f3f4f6', borderColor: darkMode ? '#3a3a3d' : '#e5e7eb'}}>
-                  <div style={{...sourcesHeader, color: darkMode ? '#cbd5e1' : '#4b5563'}}>
-                    📄 Fontes Utilizadas:
-                  </div>
+                <details style={{...sourcesCard, background: darkMode ? '#2a2a2d' : '#f3f4f6', 
+                borderColor: darkMode ? '#3a3a3d' : '#e5e7eb'}}>
+                  <summary style={{...sourcesHeader, color: darkMode ? '#cbd5e1' : '#4b5563'}}>
+                    📄 Ver fontes
+                  </summary>
                   <div style={sourcesList}>
                     {m.fontes.map((fonte, idx) => (
                       <div key={idx} style={{...sourceItem, color: darkMode ? '#cbd5e1' : '#4b5563'}}>
@@ -251,7 +271,7 @@ export default function Chat({ idToken, email, onLogout }: ChatProps) {
                       </div>
                     ))}
                   </div>
-                </div>
+                </details>
               )}
             </div>
           ))}
@@ -625,6 +645,7 @@ const sourcesCard = {
 
 const sourcesHeader = {
   color: "#cbd5e1",
+  cursor: "pointer",
   fontWeight: 600 as const,
   marginBottom: "8px",
   fontSize: "12px",

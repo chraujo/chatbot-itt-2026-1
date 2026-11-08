@@ -1,12 +1,16 @@
+from unittest.mock import Mock
+
 import pytest
 from fastapi.testclient import TestClient
 from google.auth.exceptions import TransportError
+from pydantic import SecretStr
 
 from src import dependencies
 from src.api import app
 from src.config import Settings
 from src.dependencies import get_graph, get_settings, get_vector_db
 from src.routers.chat import limiter
+from src.services import IndexNotFoundError, VectorDB
 
 VALID_TOKEN = "token-valido"
 
@@ -27,11 +31,11 @@ def fake_verify(token, request, audience, clock_skew_in_seconds):
     raise ValueError("token inválido")
 
 
-def unverified_email(token, request, audience, clock_skew_in_seconds):
+def unverified_email(*_):
     return {"email": "x@y.com", "email_verified": False}
 
 
-def google_unreachable(token, request, audience, clock_skew_in_seconds):
+def google_unreachable(*_):
     raise TransportError()
 
 
@@ -135,3 +139,29 @@ def test_admin_without_token_returns_401(client):
 
 def test_admin_with_valid_token_syncs(client):
     assert sync(client, VALID_TOKEN).status_code == 200
+
+
+def graph_raising(error):
+    return lambda: Mock(**{"invoke.side_effect": error})
+
+
+def test_missing_index_returns_503_without_internal_path(client):
+    app.dependency_overrides[get_graph] = graph_raising(IndexNotFoundError("/app/indice"))
+    response = ask(client, VALID_TOKEN)
+    assert response.status_code == 503
+    assert "ainda não foi indexada" in response.json()["detail"]
+    assert "/app/indice" not in response.text
+
+
+def test_unexpected_error_returns_500_without_internal_details(client):
+    app.dependency_overrides[get_graph] = graph_raising(RuntimeError("/app/segredo"))
+    response = ask(client, VALID_TOKEN)
+    assert response.status_code == 500
+    assert "/app/segredo" not in response.text
+
+
+def test_empty_index_folder_counts_as_missing_index(tmp_path):
+    settings = Settings(OPENWEBUI_API_KEY=SecretStr("falsa"), LLM_PROVIDER="openwebui", 
+                        FAISS_INDEX_PATH=str(tmp_path))
+    with pytest.raises(IndexNotFoundError):
+        VectorDB(settings).query("pergunta")

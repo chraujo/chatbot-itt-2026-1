@@ -67,6 +67,11 @@ Variáveis do processo prevalecem sobre `backend/.env`, que prevalece sobre
 
 ## 4. Baixar e indexar os documentos
 
+> **Atenção:** use `--drive` e **Atualizar Docs** apenas com pastas autorizadas pelo ITT.
+> Todo o conteúdo, inclusive dados pessoais, é enviado ao servidor de embeddings
+> (`OPENWEBUI_BASE_URL`), fica no índice e pode aparecer para qualquer pessoa logada,
+> pois não há permissão por perfil. Não compartilhe o índice nem o cache de embeddings.
+
 Ainda em `backend`:
 
 ```powershell
@@ -90,6 +95,11 @@ os trechos recuperados são enviados para gerar as respostas.
 Se a pasta estiver vazia ou um download falhar, a sincronização falha sem
 substituir o índice anterior. Reexecute ao alterar os documentos ou o modelo
 de embeddings. Use somente índices locais de confiança.
+
+Os embeddings ficam em cache em `FAISS_INDEX_PATH/embeddings_cache`: só os trechos
+novos vão ao servidor, e uma execução interrompida retoma de onde parou. Trate
+esse cache como o próprio índice. Ele não é limpo quando um documento sai da pasta;
+apague a pasta para limpá-lo.
 
 ## 5. Iniciar o backend e a interface
 
@@ -126,7 +136,7 @@ As fontes de planilhas mostram o arquivo e a aba, sem inventar números de pági
 
 Para testar só a API, abra http://localhost:8000/docs, clique em **Authorize**, use o token
 `dev-token` (com `AUTH_DEV_MODE=true`) e execute `POST /chat/query`
-com `{"message":"Qual é o assunto principal dos documentos?","user_id":"teste-local"}`.
+com `{"message":"Qual é o assunto principal dos documentos?"}`.
 
 ## 6. Alternativa: rodar tudo com Docker
 
@@ -148,8 +158,8 @@ docker compose up -d
 O índice FAISS fica no volume nomeado `faiss_index` e persiste entre reinícios.
 A indexação não roda no boot (`SYNC_ON_STARTUP=false`); repita o comando
 `docker compose run --rm backend ...` quando os documentos mudarem, ou use o
-botão **Atualizar Docs**. Para parar, use `docker compose down` (mantém o índice)
-ou `docker compose down -v` (apaga o índice).
+botão **Atualizar Docs**, seguindo a atenção da seção 4. Sem índice, o chat
+responde que a base ainda não foi indexada. Para parar, use `docker compose down` (mantém o índice) ou `docker compose down -v` (apaga o índice).
 
 ## Diagnóstico e testes
 
